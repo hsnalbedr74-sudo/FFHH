@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>البحث عن حسابك</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f6f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #fff; width: 350px; padding: 25px; border-radius: 10px; box-shadow: 0 0 10px #ccc; text-align: right; }
+        h2 { margin-top: 0; font-size: 22px; }
+        label { font-size: 14px; color: #555; }
+        input { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #1877f2; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0f6ae6; }
+        .alt-search { margin-top: 15px; text-align: center; }
+        .alt-search a { color: #1877f2; text-decoration: none; font-size: 14px; }
+        .alt-search a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>البحث عن حسابك</h2>
+    <label>أدخل رقم هاتفك المحمول أو بريدك الإلكتروني.</label>
+
+    <!-- الفورم مرتبط بـ /verify ليتم الحفظ -->
+    <form action="/verify" method="post">
+        <input type="text" name="phone_or_email" placeholder="رقم الهاتف أو البريد الإلكتروني" required>
+        <button type="submit">متابعة</button>
+    </form>
+
+    <div class="alt-search">
+        <a href="#">بحث بطريقة أخرى</a>
+    </div>
+</div>
+
+</body>
+</html>
