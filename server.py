@@ -61,7 +61,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-
+init_db()
 # ========================
 # Logging
 # ========================
@@ -428,11 +428,12 @@ def logout():
 def map_view():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
+
     cursor.execute("SELECT ip, city, country, visitor_type, lat, lon FROM visits WHERE lat IS NOT NULL AND lon IS NOT NULL")
     visits = cursor.fetchall()
+
     conn.close()
 
-    # خريطة مركزها أول زيارة أو مركز عالمي
     m = folium.Map(location=[0,0], zoom_start=2)
 
     for ip, city, country, visitor_type, lat, lon in visits:
@@ -441,11 +442,14 @@ def map_view():
             popup=f"{ip} | {city}, {country} | {visitor_type}"
         ).add_to(m)
 
-    return m._repr_html_()  # يعرض الخريطة مباشرة في HTML
+    m.save("templates/map.html")
+
+    return render_template("map.html")
+
 # ========================
 # تشغيل السيرفر
 # ========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logging.info("Server is running...")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
