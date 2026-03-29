@@ -61,7 +61,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-init_db()
+
 # ========================
 # Logging
 # ========================
@@ -99,18 +99,15 @@ def get_real_ip():
 # ========================
 def get_location(ip):
     try:
-        url = f"http://ip-api.com/json/{ip}"
+        url = f"https://ipapi.co/{ip}/json/"
         response = requests.get(url, timeout=3)
         data = response.json()
-        if data.get("status") == "success":
-            country = data.get("country", "Unknown")
-            city = data.get("city", "Unknown")
-            isp = data.get("isp", "Unknown")
-            lat = data.get("lat", None)  # خط العرض
-            lon = data.get("lon", None)  # خط الطول
-        else:
-            country = city = isp = None
-            lat = lon = None
+        country = data.get("country", "Unknown")
+        city = data.get("city", "Unknown")
+        isp = data.get("isp", "Unknown")
+        lat = data.get("lat", None)  # خط العرض
+        lon = data.get("lon", None)  # خط الطول
+
         return country, city, isp, lat, lon
     except Exception as e:
         logging.error(f"Location API error: {e}")
@@ -404,7 +401,7 @@ def admin():
     html += "</table><br><br>"
 
     html += "<h2>Visits</h2><table border='1' cellpadding='5'><tr>"
-    html += "<th>ID</th><th>IP</th><th>Country</th><th>City</th><th>ISP</th><th>Path</th><th>Method</th><th>User Agent</th><th>Visitor Type</th><th>Time</th></tr>"
+    html += "<th>ID</th><th>IP</th><th>Country</th><th>City</th><th>ISP</th><th>Path</th><th>Method</th><th>User Agent</th><th>Visitor Type</th><th>Time</th></tr><th>Latitude</th><th>Longitude</th></tr>"
 
     for visit in visits:
         html += "<tr>" + "".join(f"<td>{col}</td>" for col in visit) + "</tr>"
@@ -428,13 +425,12 @@ def logout():
 def map_view():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
-
     cursor.execute("SELECT ip, city, country, visitor_type, lat, lon FROM visits WHERE lat IS NOT NULL AND lon IS NOT NULL")
     visits = cursor.fetchall()
-
     conn.close()
 
-    m = folium.Map(location=[0,0], zoom_start=2)
+    # خريطة مركزها أول زيارة أو مركز عالمي
+    m = folium.Map(location=[20,0], zoom_start=3, tiles="Esri.WorldImagery")
 
     for ip, city, country, visitor_type, lat, lon in visits:
         folium.Marker(
@@ -442,14 +438,11 @@ def map_view():
             popup=f"{ip} | {city}, {country} | {visitor_type}"
         ).add_to(m)
 
-    m.save("templates/map.html")
-
-    return render_template("map.html")
-
+    return m._repr_html_()  # يعرض الخريطة مباشرة في HTML
 # ========================
 # تشغيل السيرفر
 # ========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logging.info("Server is running...")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)
