@@ -5,6 +5,7 @@ import sqlite3
 import requests
 from colorama import Fore
 import folium
+import os
 # ========================
 # إنشاء قاعدة البيانات
 # ========================
@@ -60,7 +61,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-
+init_db() # تشغيل قاعدة البيانات
 # ========================
 # Logging
 # ========================
@@ -99,11 +100,11 @@ def get_location(ip):
         url = f"https://ipapi.co/{ip}/json/"
         response = requests.get(url, timeout=3)
         data = response.json()
-        country = data.get("country", "Unknown")
+        country = data.get("country_name", "Unknown")
         city = data.get("city", "Unknown")
-        isp = data.get("isp", "Unknown")
-        lat = data.get("lat", None)  # خط العرض
-        lon = data.get("lon", None)  # خط الطول
+        isp = data.get("org", "Unknown")
+        lat = data.get("latitude", None)  # خط العرض
+        lon = data.get("longitude", None)  # خط الطول
 
         return country, city, isp, lat, lon
     except Exception as e:
@@ -365,7 +366,7 @@ def admin():
     html += "</table><br><br>"
 
     html += "<h2>Visits</h2><table border='1' cellpadding='5'><tr>"
-    html += "<th>ID</th><th>IP</th><th>Country</th><th>City</th><th>ISP</th><th>Path</th><th>Method</th><th>User Agent</th><th>Visitor Type</th><th>Time</th></tr><th>Latitude</th><th>Longitude</th></tr>"
+><    html += "<th>ID</th><th>IP</th><th>Country</th><th>City</th><th>ISP</th><th>Path</th><th>Method</th><th>User Agent</th><th>Visitor Type</th><th>Time</th><th>Latitude</th><th>Longitude</th></tr>"
 
     for visit in visits:
         html += "<tr>" + "".join(f"<td>{col}</td>" for col in visit) + "</tr>"
