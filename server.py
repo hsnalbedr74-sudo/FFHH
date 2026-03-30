@@ -113,28 +113,45 @@ def get_real_ip():
 def get_location(ip):
 
     try:
-
         url = f"https://ipapi.co/{ip}/json/"
-        response = requests.get(url, timeout=3)
-
-        if response.status_code != 200:
-            return "Unknown","Unknown","Unknown",None,None
-
+        response = requests.get(
+            url,
+            headers={"User-Agent":"Mozilla/5.0"},
+            timeout=3
+        )
         data = response.json()
 
-        country = data.get("country_name","Unknown")
-        city = data.get("city","Unknown")
-        isp = data.get("org","Unknown")
-        Latitude = data.get("latitude",None)
-        Longitude = data.get("longitude",None)
+        # إذا نجحت الخدمة
+        if "latitude" in data and "longitude" in data:
 
-        return country,city,isp,Latitude,Longitude
+            country = data.get("country_name","Unknown")
+            city = data.get("city","Unknown")
+            isp = data.get("org","Unknown")
+            lat = data.get("latitude")
+            lon = data.get("longitude")
+
+            return country,city,isp,lat,lon
+
+        # fallback إلى API آخر
+        logging.warning("Primary API failed, using fallback")
+
+        url = f"http://ip-api.com/json/{ip}"
+        response = requests.get(url, timeout=3)
+        data = response.json()
+
+        country = data.get("country","Unknown")
+        city = data.get("city","Unknown")
+        isp = data.get("isp","Unknown")
+        lat = data.get("lat")
+        lon = data.get("lon")
+
+        return country,city,isp,lat,lon
 
     except Exception as e:
 
         logging.error(f"Location API error: {e}")
-        return "Unknown", "Unknown", "Unknown", None, None
 
+        return "Unknown","Unknown","Unknown",None,None
 # ========================
 # تسجيل كل request
 # ========================
