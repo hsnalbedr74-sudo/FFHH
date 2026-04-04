@@ -5,6 +5,11 @@ import sqlite3
 import requests
 import folium
 import os
+from werkzeug.security import generate_password_hash, check_password_hash
+#print(generate_password_hash("RafifIsMyLove"))
+#from flask_limiter import Limiter
+#from flask_limiter.util import get_remote_address
+ip_cache = {}
 
 # ========================
 # Logging Setup
@@ -85,7 +90,8 @@ init_db()
 # ========================
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+
+app.secret_key = "84c083dba137692b646b525c9b5c12356f3a2d6d87d8b65340681f0edf371a06"
 
 # ========================
 # استخراج IP الحقيقي
@@ -100,9 +106,11 @@ def get_real_ip():
 
     if not ip:
         ip = request.remote_addr
+    
+    if not ip:
+        ip = "0.0.0.0"
 
-    if ip:
-        ip = ip.split(",")[0].strip()
+    ip = ip.split(",")[0].strip()
 
     return ip
 
@@ -113,30 +121,17 @@ def get_real_ip():
 def get_location(ip):
 
     try:
-        url = f"https://ipapi.co/{ip}/json/"
+        if ip in ip_cache:
+            return ip_cache[ip]
+        if not ip:
+            return "Unknown","Unknown","Unknown",None,None
+        url = f"http://ip-api.com/{ip}/json/"
         response = requests.get(
             url,
             headers={"User-Agent":"Mozilla/5.0"},
-            timeout=3
+            timeout = 3
         )
-        data = response.json()
-
-        # إذا نجحت الخدمة
-        if "latitude" in data and "longitude" in data:
-
-            country = data.get("country_name","Unknown")
-            city = data.get("city","Unknown")
-            isp = data.get("org","Unknown")
-            lat = data.get("latitude")
-            lon = data.get("longitude")
-
-            return country,city,isp,lat,lon
-
-        # fallback إلى API آخر
-        logging.warning("Primary API failed, using fallback")
-
-        url = f"http://ip-api.com/json/{ip}"
-        response = requests.get(url, timeout=3)
+        
         data = response.json()
 
         country = data.get("country","Unknown")
@@ -144,8 +139,9 @@ def get_location(ip):
         isp = data.get("isp","Unknown")
         lat = data.get("lat")
         lon = data.get("lon")
-
-        return country,city,isp,lat,lon
+        result = (country, city, isp, lat, lon)
+        ip_cache[ip] = result 
+        return result
 
     except Exception as e:
 
@@ -361,14 +357,15 @@ def verify_code():
 
 @app.route("/admin_login",methods=["GET","POST"])
 def admin_login():
-
     if request.method == "POST":
 
         username = request.form.get("username")
         password = request.form.get("password")
-
-        if username == "Hasan@RR" and password == "RafifIsMyLove":
-
+        logging.warning("login attempt to admin pannel")
+        print(request.form)
+        ADMIN_USERNAME = "Hasan@RR"
+        ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$WhhbEssDYngVjahx$37312cd2f245477e18030b9ef7f92572dbf9cf8c37ba356fc24fb76686dc7fab8dde889c163f2cc6fdfc2424c8c70e18b213aa56258e9487da5c7b68e128280d"
+        if username == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH,password):
             session["admin"] = True
             logging.warning("Admin logged in")
 
@@ -411,7 +408,6 @@ def admin_logout():
 
 @app.route("/admin")
 def admin():
-
     if not session.get("admin"):
         return redirect("/admin_login")
 
