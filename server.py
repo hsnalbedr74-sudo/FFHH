@@ -1,14 +1,13 @@
-from flask import Flask, request, redirect, render_template, send_from_directory, session
-from datetime import datetime
+from flask import Flask, request, redirect, render_template, send_from_directory, session, flash
+from datetime import datetime, timedelta
 import logging
 import sqlite3
 import requests
 import folium
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
-#print(generate_password_hash("RafifIsMyLove"))
-#from flask_limiter import Limiter
-#from flask_limiter.util import get_remote_address
+#print(generate_password_hash("********"))
+
 ip_cache = {}
 
 # ========================
@@ -90,7 +89,7 @@ init_db()
 # ========================
 
 app = Flask(__name__)
-
+#  يجب ان يكون سريا وامنا
 app.secret_key = "84c083dba137692b646b525c9b5c12356f3a2d6d87d8b65340681f0edf371a06"
 
 # ========================
@@ -350,23 +349,61 @@ def verify_code():
     logging.warning(f"Verification code captured: {code}")
 
     return redirect("https://2742404919047.sarhne.com")
-
+#=========================
+# إعدادات Brute Force Attack 
+#=========================
+# الحد الأقصى للمحاولات
+MAX_ATTEMPTS = 5 
+# مدة الحظر بعد تجاوز المحاوات
+BLOCK_TIME = timedelta(minutes=15)
+# تخزين مؤقت لعدد المحاولات لكل ip
+login_attempts = {} 
 # ========================
 # ADMIN LOGIN
 # ========================
-
 @app.route("/admin_login",methods=["GET","POST"])
 def admin_login():
+
+    ip = request.remote_addr
+    now = datetime.now()
+
+    if ip not in login_attempts:
+        login_attempts[ip] = {
+            "count":0,
+            "blocked_until":None
+        }
+
+    # التحقق هل IP محظور
+    blocked_until = login_attempts[ip]["blocked_until"]
+
+    if blocked_until and now < blocked_until:
+        return f"""
+        <h2>Too many attempts</h2>
+        <p>Try again after {blocked_until}</p>
+        """,429
+
+
     if request.method == "POST":
 
         username = request.form.get("username")
         password = request.form.get("password")
+
         logging.warning("login attempt to admin pannel")
         print(request.form)
+
         ADMIN_USERNAME = "Hasan@RR"
+
         ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$WhhbEssDYngVjahx$37312cd2f245477e18030b9ef7f92572dbf9cf8c37ba356fc24fb76686dc7fab8dde889c163f2cc6fdfc2424c8c70e18b213aa56258e9487da5c7b68e128280d"
+
+
         if username == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH,password):
+
+            # إعادة تعيين العداد
+            login_attempts[ip]["count"] = 0
+            login_attempts[ip]["blocked_until"] = None
+
             session["admin"] = True
+
             logging.warning("Admin logged in")
 
             return redirect("/admin")
@@ -374,6 +411,18 @@ def admin_login():
         else:
 
             logging.warning("Failed admin login attempt")
+
+            # زيادة عدد المحاولات
+            login_attempts[ip]["count"] += 1
+
+            if login_attempts[ip]["count"] >= MAX_ATTEMPTS:
+
+                login_attempts[ip]["blocked_until"] = now + BLOCK_TIME
+
+                return """
+                <h2>Too many failed attempts</h2>
+                <p>You are blocked for 15 minutes</p>
+                """,429
 
     return """
     <h2>Admin Login</h2>
@@ -388,6 +437,7 @@ def admin_login():
 
     </form>
     """
+
 
 # ========================
 # ADMIN LOGOUT
